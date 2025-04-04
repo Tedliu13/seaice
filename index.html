@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sea Ice Animation</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            background-color: black;
+            color: white;
+        }
+        #content-container {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        #cesiumContainer {
+            width: 50%; height: 500px;
+            position: relative;
+        }
+        #chart-container {
+            width: 50%; display: flex; justify-content: center; align-items: center; padding: 20px;
+        }
+        #chart-container canvas { width: 100% !important; height: 400px !important; }
+        #controls {
+            margin-top: 20px;
+            text-align: center;
+            width: 100%;
+        }
+        #basemapSelector {
+            margin-top: 10px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            background-color: white;
+            color: black;
+            border: none;
+            cursor: pointer;
+        }
+        #yearLabel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 4px 10px;
+            border-radius: 6px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        #logoImage {
+            position: absolute;
+            bottom: 0px;
+            right: 30px;
+            z-index: 10;
+        }
+        #logoImage img {
+            height: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div id="content-container">
+        <div id="cesiumContainer">
+            <div id="yearLabel"></div>
+            <a id="logoImage" href="https://www.ncdr.nat.gov.tw/" target="_blank">
+                <img src="logo-white.png" alt="國家災害防救科技中心">
+            </a>
+        </div>
+        <div id="chart-container">
+            <canvas id="seaIceChart"></canvas>
+        </div>
+    </div>
+    <div id="controls">
+        <label for="basemapSelector">地球底圖：</label>
+        <select id="basemapSelector">
+            <option value="bing">Bing Maps Aerial</option>
+            <option value="naturalEarth">Natural Earth II</option>
+            <option value="osm">Carto Dark Matter</option>
+        </select>
+        <label for="speedRange">播放速度：</label>
+        <input type="range" id="speedRange" min="100" max="2000" step="100" value="300" onchange="updateSpeed(this.value)">
+        <span id="speedValue">300</span> ms
+        <br>
+        <button onclick="prevFrame()">前一年</button>
+        <button id="playPauseButton" onclick="togglePlay()">暫停</button>
+        <button onclick="nextFrame()">下一年</button>
+    </div>
+
+    <script>
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyZjI0NDZjYS02YjRlLTRkNzQtOTkyMi1lMTllN2U0NTdjOWIiLCJpZCI6Mjg5NDQwLCJpYXQiOjE3NDM0MTExNTl9.YipWOIxM9T1BTJ89miUOM9NUQu8IVYUpE8NPxDzh0r8';
+
+        const years = [...Array(40).keys()].map(i => 1985 + i);
+        const anomalyData = [
+            0.17, 0.29, 0.31, 0.27, 0.19, 0.07, 0.1, 0.3, 0.07, 0.24,
+            0.05, 0.32, 0.17, 0.13, 0.08, 0.1, 0.18, 0.06, 0.07, 0.05,
+            0.00, 0.03, -0.27, -0.19, -0.04, -0.14, -0.18, -0.41, -0.08, -0.09,
+            -0.19, -0.24, -0.2, -0.12, -0.2, -0.3, -0.08, -0.12, -0.21, -0.19
+        ];
+        const imageryFiles = years.map(year => `cesium_tiles/sic_${year}.png`);
+
+        let currentIndex = 0;
+        let playing = false;
+        let interval;
+        let playbackSpeed = 300;
+        let imageryLayer;
+
+        function updateSpeed(val) {
+            playbackSpeed = parseInt(val);
+            document.getElementById('speedValue').innerText = val;
+            if (playing) {
+                clearInterval(interval);
+                interval = setInterval(() => {
+                    nextFrame();
+                }, playbackSpeed);
+            }
+        }
+
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            baseLayerPicker: false,
+            animation: false,
+            timeline: false,
+            homeButton: false,
+            sceneModePicker: false,
+            geocoder: false
+        });
+
+        const baseLayers = {
+            "bing": () => Cesium.IonImageryProvider.fromAssetId(2),
+            "naturalEarth": () => Promise.resolve(new Cesium.UrlTemplateImageryProvider({
+                url: 'https://services.arcgisonline.com/arcgis/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}',
+                credit: 'Esri'
+            })),
+            "osm": () => Promise.resolve(new Cesium.UrlTemplateImageryProvider({
+                url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+                credit: '©CartoDB Dark Matter'
+            }))
+        };
+
+        async function setBaseLayer(type) {
+            while (viewer.imageryLayers.length > 0) {
+                viewer.imageryLayers.remove(viewer.imageryLayers.get(0), true);
+            }
+            const provider = await baseLayers[type]();
+            viewer.imageryLayers.addImageryProvider(provider);
+            updateCesiumLayer(currentIndex);
+        }
+
+        document.getElementById("basemapSelector").addEventListener("change", e => {
+            setBaseLayer(e.target.value);
+        });
+
+        Cesium.CesiumTerrainProvider.fromIonAssetId(1).then(terrain => {
+            viewer.terrainProvider = terrain;
+        });
+
+        viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(0, 75, 3555000),
+            orientation: {
+                heading: Cesium.Math.toRadians(0),
+                pitch: Cesium.Math.toRadians(-65),
+                roll: 0
+            }
+        });
+
+        const ctx = document.getElementById("seaIceChart").getContext("2d");
+        const seaIceChart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: years,
+                datasets: [{
+                    label: "北極海冰距平(相對於1985~2024年平均的增減比例)",
+                    data: new Array(years.length).fill(null),
+                    backgroundColor: anomalyData.map(v => v >= 0 ? "blue" : "red")
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: -0.5,
+                        max: 0.4,
+                        title: {
+                            display: true,
+                            text: "Anomaly"
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: "北極海冰變化",
+                        font: { size: 36 },
+                        color: "white"
+                    },
+                    subtitle: {
+                        display: true,
+                        text: "(相較於1985~2024年平均)",
+                        font: { size: 24 },
+                        color: "white"
+                    }
+                },
+                onHover: (event, chartElement) => {
+                    if (!playing && chartElement.length > 0) {
+                        const index = chartElement[0].index;
+                        const dataset = seaIceChart.data.datasets[0];
+                        const colors = anomalyData.map((v, i) => i === index ? "yellow" : v >= 0 ? "blue" : "red");
+                        dataset.backgroundColor = colors;
+                        seaIceChart.update();
+                        updateCesiumLayer(index);
+                        updateYearLabel(index);
+                    }
+                },
+           }
+        });
+
+        function updateYearLabel(index) {
+            document.getElementById("yearLabel").textContent = years[index];
+        }
+
+        function updateCesiumLayer(index) {
+            const url = imageryFiles[index];
+            const newLayer = viewer.imageryLayers.addImageryProvider(
+                new Cesium.SingleTileImageryProvider({
+                    url,
+                    rectangle: Cesium.Rectangle.fromDegrees(-180, -90, 180, 90)
+                })
+            );
+
+            if (imageryLayer) imageryLayer.alpha = 1.0; // ✅ 保留舊圖層不透明直到 fadeIn 完成
+
+            newLayer.alpha = 0.0;
+            const fadeIn = setInterval(() => {
+                newLayer.alpha += 0.1;
+                if (newLayer.alpha >= 1.0) {
+                    newLayer.alpha = 1.0;
+                    clearInterval(fadeIn);
+                    if (imageryLayer) viewer.imageryLayers.remove(imageryLayer);
+                    imageryLayer = newLayer;
+                }
+            }, 30);
+        }
+
+
+        function showFrame(index) {
+            updateCesiumLayer(index);
+            seaIceChart.data.datasets[0].data.fill(null);
+            for (let i = 0; i <= index; i++) {
+                seaIceChart.data.datasets[0].data[i] = anomalyData[i];
+            }
+            seaIceChart.data.datasets[0].backgroundColor = anomalyData.map(v => v >= 0 ? "blue" : "red");
+            seaIceChart.update();
+            updateYearLabel(index);
+        }
+
+        function nextFrame() {
+            if (currentIndex < years.length - 1) {
+                currentIndex++;
+                showFrame(currentIndex);
+            } else {
+                clearInterval(interval);
+                playing = false;
+                document.getElementById("playPauseButton").innerText = "播放";
+            }
+        }
+
+        function prevFrame() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                showFrame(currentIndex);
+            }
+        }
+
+        function togglePlay() {
+            if (playing) {
+                clearInterval(interval);
+                playing = false;
+                document.getElementById("playPauseButton").innerText = "播放";
+            } else {
+                if (currentIndex >= years.length - 1) {
+                    currentIndex = 0;
+                    seaIceChart.data.datasets[0].data.fill(null);
+                }
+                playing = true;
+                document.getElementById("playPauseButton").innerText = "暫停";
+                interval = setInterval(() => {
+                    nextFrame();
+                }, playbackSpeed);
+            }
+        }
+
+        window.onload = () => {
+            setBaseLayer("bing");
+            showFrame(currentIndex);
+            togglePlay();
+        };
+    </script>
+</body>
+</html>
