@@ -272,13 +272,12 @@
         function nextFrame() {
             if (currentIndex < years.length - 1) {
                 currentIndex++;
-                showFrame(currentIndex);
             } else {
-                clearInterval(interval);
-                playing = false;
-                document.getElementById("playPauseButton").innerText = "播放";
+                currentIndex = 0; // 循環
             }
+            showFrame(currentIndex);
         }
+
 
         function prevFrame() {
             if (currentIndex > 0) {
