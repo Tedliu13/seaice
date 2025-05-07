@@ -170,7 +170,7 @@
         });
 
         viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(0, 75, 3555000),
+            destination: Cesium.Cartesian3.fromDegrees(-145, 70, 3555000),
             orientation: {
                 heading: Cesium.Math.toRadians(0),
                 pitch: Cesium.Math.toRadians(-65),
@@ -190,32 +190,44 @@
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        min: -0.5,
-                        max: 0.4,
-                        title: {
-                            display: true,
-                            text: "增減比例"
-                        }
-                    }
-                },
-                plugins: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    min: -0.5,
+                    max: 0.4,
                     title: {
                         display: true,
-                        text: "北極海冰變化",
-                        font: { size: 36 },
-                        color: "white"
+                        text: "增減比例",
+                        font: { size: 16 }
                     },
-                    subtitle: {
-                        display: true,
-                        text: "(相較於1985~2024年平均)",
-                        font: { size: 24 },
-                        color: "white"
+                    ticks: {
+                        font: { size: 16 }
                     }
                 },
+                x: {
+                    ticks: {
+                        font: { size: 14 }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false  // ❌ 不顯示圖例
+                },
+                title: {
+                    display: true,
+                    text: "北極海冰變化",
+                    font: { size: 36 },
+                    color: "white"
+                },
+                subtitle: {
+                    display: true,
+                    text: "(相較於1985~2024年平均)",
+                    font: { size: 24 },
+                    color: "white"
+                }
+            },
                 onHover: (event, chartElement) => {
                     if (!playing && chartElement.length > 0) {
                         const index = chartElement[0].index;
