@@ -95,7 +95,7 @@
         </select>
         <label for="speedRange">每幅間隔時間：</label>
         <input type="range" id="speedRange" min="100" max="2000" step="100" value="500" onchange="updateSpeed(this.value)">
-        <span id="speedValue">500</span> ms
+        <span id="speedValue">500</span> ms 
         <br>
         <button onclick="prevFrame()">前一年</button>
         <button id="playPauseButton" onclick="togglePlay()">暫停</button>
@@ -320,5 +320,11 @@
             togglePlay();
         };
     </script>
+    <div style="position: fixed; bottom: 5px; right: 10px; z-index: 20; color: white; font-size: 14px;">
+        資料來源：
+        <a href="https://svs.gsfc.nasa.gov/5395/" target="_blank" style="color: lightblue;">
+            NASA/Goddard Space Flight Center
+        </a>
+    </div>
 </body>
 </html>
