@@ -25,13 +25,13 @@
             position: relative;
         }
         #cesiumContainer {
-            width: 50%; height: 80vh;
+            width: 50%; height: 65vh; margin: 50px 0 20px;
             position: relative;
         }
         #chart-container {
-            width: 50%; display: flex; justify-content: center; align-items: center; padding: 20px;
+            width: 50%; display: flex; justify-content: center; align-items: center; padding: 20px;margin: 50px 0 20px;
         }
-        #chart-container canvas { width: 100% !important; height: 80vh !important; }
+        #chart-container canvas { width: 100% !important; height: 65vh !important; }
         #controls {
             margin-top: 0px;
             text-align: center;
@@ -94,8 +94,8 @@
             <option value="osm">Carto Dark Matter</option>
         </select>
         <label for="speedRange">每幅間隔時間：</label>
-        <input type="range" id="speedRange" min="100" max="2000" step="100" value="300" onchange="updateSpeed(this.value)">
-        <span id="speedValue">300</span> ms
+        <input type="range" id="speedRange" min="100" max="2000" step="100" value="500" onchange="updateSpeed(this.value)">
+        <span id="speedValue">500</span> ms
         <br>
         <button onclick="prevFrame()">前一年</button>
         <button id="playPauseButton" onclick="togglePlay()">暫停</button>
@@ -117,7 +117,7 @@
         let currentIndex = 0;
         let playing = false;
         let interval;
-        let playbackSpeed = 300;
+        let playbackSpeed = 500;
         let imageryLayer;
 
         function updateSpeed(val) {
@@ -184,7 +184,7 @@
             data: {
                 labels: years,
                 datasets: [{
-                    label: "北極海冰距平(相對於1985~2024年平均的增減比例)",
+                    label: "海冰面積變化率(相對於1985~2024年平均)",
                     data: new Array(years.length).fill(null),
                     backgroundColor: anomalyData.map(v => v >= 0 ? "blue" : "red")
                 }]
@@ -198,16 +198,19 @@
                     max: 0.4,
                     title: {
                         display: true,
-                        text: "增減比例",
-                        font: { size: 16 }
+                        text: "變化率",
+                        font: { size: 16 },
+                        color: "white"
                     },
                     ticks: {
-                        font: { size: 16 }
+                        font: { size: 16 },
+                        color: "white"
                     }
                 },
                 x: {
                     ticks: {
-                        font: { size: 14 }
+                        font: { size: 14 },
+                        color: "white"
                     }
                 }
             },
@@ -217,7 +220,7 @@
                 },
                 title: {
                     display: true,
-                    text: "北極海冰變化",
+                    text: "北極海冰面積變化率",
                     font: { size: 36 },
                     color: "white"
                 },
@@ -248,6 +251,7 @@
 
         function updateCesiumLayer(index) {
             const url = imageryFiles[index];
+
             const newLayer = viewer.imageryLayers.addImageryProvider(
                 new Cesium.SingleTileImageryProvider({
                     url,
@@ -255,19 +259,13 @@
                 })
             );
 
-            if (imageryLayer) imageryLayer.alpha = 1.0; // ✅ 保留舊圖層不透明直到 fadeIn 完成
+            if (imageryLayer) {
+                viewer.imageryLayers.remove(imageryLayer);
+            }
 
-            newLayer.alpha = 0.0;
-            const fadeIn = setInterval(() => {
-                newLayer.alpha += 0.1;
-                if (newLayer.alpha >= 1.0) {
-                    newLayer.alpha = 1.0;
-                    clearInterval(fadeIn);
-                    if (imageryLayer) viewer.imageryLayers.remove(imageryLayer);
-                    imageryLayer = newLayer;
-                }
-            }, 30);
+            imageryLayer = newLayer;
         }
+
 
 
         function showFrame(index) {
