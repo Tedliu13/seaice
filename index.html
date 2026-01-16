@@ -94,8 +94,8 @@
             <option value="osm">Carto Dark Matter</option>
         </select>
         <label for="speedRange">每幅間隔時間：</label>
-        <input type="range" id="speedRange" min="100" max="1000" step="100" value="700" onchange="updateSpeed(this.value)">
-        <span id="speedValue">700</span> ms 
+        <input type="range" id="speedRange" min="500" max="1500" step="100" value="1000" onchange="updateSpeed(this.value)">
+        <span id="speedValue">1000</span> ms 
         <br>
         <button onclick="prevFrame()">上一年</button>
         <button id="playPauseButton" onclick="togglePlay()">暫停</button>
@@ -126,7 +126,7 @@
         let currentIndex = 0;
         let playing = false;
         let interval;
-        let playbackSpeed = 700;
+        let playbackSpeed = 1000;
         let imageryLayer;
         let fadeRaf;
         let fadeDurationMs = 60;
@@ -189,7 +189,7 @@
         });
 
         viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(-145, 70, 3555000),
+            destination: Cesium.Cartesian3.fromDegrees(-145, 65, 3555000),
             orientation: {
                 heading: Cesium.Math.toRadians(0),
                 pitch: Cesium.Math.toRadians(-65),
